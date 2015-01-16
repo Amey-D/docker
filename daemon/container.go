@@ -35,6 +35,7 @@ import (
 )
 
 const DefaultPathEnv = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+const IpvlanMasterDevice = "eth0"
 
 var (
 	ErrNotATTY               = errors.New("The PTY is not a file")
@@ -217,6 +218,7 @@ func populateCommand(c *Container, env []string) error {
 		if !c.Config.NetworkDisabled {
 			network := c.NetworkSettings
 			en.Interface = &execdriver.NetworkInterface{
+				Type:                 "veth",
 				Gateway:              network.Gateway,
 				Bridge:               network.Bridge,
 				IPAddress:            network.IPAddress,
@@ -234,6 +236,22 @@ func populateCommand(c *Container, env []string) error {
 			return err
 		}
 		en.ContainerID = nc.ID
+	case "ipvlan":
+		if !c.Config.NetworkDisabled {
+			network := c.NetworkSettings
+			en.Interface = &execdriver.NetworkInterface{
+				Type:                 "ipvlan",
+				IpvlanMasterDevice:   IpvlanMasterDevice,
+				IpvlanDeviceMode:     "l3",
+				Gateway:              network.Gateway,
+				IPAddress:            network.IPAddress,
+				IPPrefixLen:          network.IPPrefixLen,
+				LinkLocalIPv6Address: network.LinkLocalIPv6Address,
+				GlobalIPv6Address:    network.GlobalIPv6Address,
+				GlobalIPv6PrefixLen:  network.GlobalIPv6PrefixLen,
+				IPv6Gateway:          network.IPv6Gateway,
+			}
+		}
 	default:
 		return fmt.Errorf("invalid network mode: %s", c.hostConfig.NetworkMode)
 	}

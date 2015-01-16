@@ -35,6 +35,12 @@ const (
 	MACVLAN_MODE_PASSTHRU
 )
 
+const (
+	IFLA_IPVLAN_MODE = 1
+	IPVLAN_MODE_L2   = 0
+	IPVLAN_MODE_L3   = 1
+)
+
 var nextSeqNr uint32
 
 type ifreqHwaddr struct {
@@ -793,29 +799,70 @@ func NetworkLinkAddVlan(masterDev, vlanDev string, vlanId uint16) error {
 	return s.HandleAck(wb.Seq)
 }
 
-// MacVlan link has LowerDev, UpperDev and operates in Mode mode
-// This simplifies the code when creating MacVlan or MacVtap interface
+///////////////////////////////////////////////////////////////////////////////
+// Handle MACVLAN, MACVTAP and IPVLAN device tyoes.
+
+// Structure to represent a device of type MACVLAN, MACVTAP or IPVLAN.
+// Link of either Type has SlaveDev, MasterDev and operates in the given mode.
 type MacVlanLink struct {
+	Type      string
 	MasterDev string
 	SlaveDev  string
 	mode      string
 }
 
-func (m MacVlanLink) Mode() uint32 {
-	modeMap := map[string]uint32{
-		"private":  MACVLAN_MODE_PRIVATE,
-		"vepa":     MACVLAN_MODE_VEPA,
-		"bridge":   MACVLAN_MODE_BRIDGE,
-		"passthru": MACVLAN_MODE_PASSTHRU,
-	}
-
-	return modeMap[m.mode]
+var macVlanModeMap = map[string]uint32{
+	"private":  MACVLAN_MODE_PRIVATE,
+	"vepa":     MACVLAN_MODE_VEPA,
+	"bridge":   MACVLAN_MODE_BRIDGE,
+	"passthru": MACVLAN_MODE_PASSTHRU,
 }
 
-// Add MAC VLAN network interface with masterDev as its upper device
+var ipVlanModeMap = map[string]uint32{
+	"l2": IPVLAN_MODE_L2,
+	"l3": IPVLAN_MODE_L3,
+}
+
+var devTypeModeMap = map[string]map[string]uint32{
+	"macvlan": macVlanModeMap,
+	"macvtap": macVlanModeMap,
+	"ipvlan":  ipVlanModeMap,
+}
+
+func (m MacVlanLink) Mode() uint32 {
+	return devTypeModeMap[m.Type][m.mode]
+}
+
+func validateMacVlanLink(m *MacVlanLink) error {
+	_, present := devTypeModeMap[m.Type]
+	if !present {
+		return fmt.Errorf("Unsupported device type: '%s'", m.Type)
+	}
+
+	if len(m.MasterDev) == 0 {
+		return fmt.Errorf("Master device name cannot be empty.")
+	}
+	if len(m.SlaveDev) == 0 {
+		return fmt.Errorf("Slave device name cannot be empty.")
+	}
+
+	_, present = devTypeModeMap[m.Type][m.mode]
+	if !present {
+		fmt.Errorf("Unknown type '%s' for device type '%s'", m.mode, m.Type)
+	}
+
+	return nil
+}
+
+// Add MACVLAN, MACVTAP or IPVLAN network interface.
+// The new interface to be created is described by MacVlanLink.
 // This is identical to running:
-// ip link add name $name link $masterdev type macvlan mode $mode
-func networkLinkMacVlan(dev_type string, mcvln *MacVlanLink) error {
+// ip link add name $name link $masterdev type $type mode $mode
+func networkLinkIpMacVlan(mcvln *MacVlanLink) error {
+	err := validateMacVlanLink(mcvln)
+	if err != nil {
+		return err
+	}
 	s, err := getNetlinkSocket()
 	if err != nil {
 		return err
@@ -833,7 +880,7 @@ func networkLinkMacVlan(dev_type string, mcvln *MacVlanLink) error {
 	wb.AddData(msg)
 
 	nest1 := newRtAttr(syscall.IFLA_LINKINFO, nil)
-	newRtAttrChild(nest1, IFLA_INFO_KIND, nonZeroTerminated(dev_type))
+	newRtAttrChild(nest1, IFLA_INFO_KIND, nonZeroTerminated(mcvln.Type))
 
 	nest2 := newRtAttrChild(nest1, IFLA_INFO_DATA, nil)
 	macVlanData := make([]byte, 4)
@@ -851,7 +898,8 @@ func networkLinkMacVlan(dev_type string, mcvln *MacVlanLink) error {
 }
 
 func NetworkLinkAddMacVlan(masterDev, macVlanDev string, mode string) error {
-	return networkLinkMacVlan("macvlan", &MacVlanLink{
+	return networkLinkIpMacVlan(&MacVlanLink{
+		Type:      "macvlan",
 		MasterDev: masterDev,
 		SlaveDev:  macVlanDev,
 		mode:      mode,
@@ -859,12 +907,24 @@ func NetworkLinkAddMacVlan(masterDev, macVlanDev string, mode string) error {
 }
 
 func NetworkLinkAddMacVtap(masterDev, macVlanDev string, mode string) error {
-	return networkLinkMacVlan("macvtap", &MacVlanLink{
+	return networkLinkIpMacVlan(&MacVlanLink{
+		Type:      "macvtap",
 		MasterDev: masterDev,
 		SlaveDev:  macVlanDev,
 		mode:      mode,
 	})
 }
+
+func NetworkLinkAddIpVlan(masterDev, ipVlanDev string, mode string) error {
+	return networkLinkIpMacVlan(&MacVlanLink{
+		Type:      "ipvlan",
+		MasterDev: masterDev,
+		SlaveDev:  ipVlanDev,
+		mode:      mode,
+	})
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 func networkLinkIpAction(action, flags int, ifa IfAddr) error {
 	s, err := getNetlinkSocket()

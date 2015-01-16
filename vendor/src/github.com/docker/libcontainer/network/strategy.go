@@ -13,6 +13,7 @@ var (
 var strategies = map[string]NetworkStrategy{
 	"veth":     &Veth{},
 	"loopback": &Loopback{},
+	"ipvlan":   &Ipvlan{},
 }
 
 // NetworkStrategy represents a specific network configuration for

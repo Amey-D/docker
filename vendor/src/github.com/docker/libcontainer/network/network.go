@@ -36,6 +36,10 @@ func CreateVethPair(name1, name2 string, txQueueLen int) error {
 	return netlink.NetworkCreateVethPair(name1, name2, txQueueLen)
 }
 
+func CreateIpvlanDevice(masterDev, ipVlanDev string, mode string) error {
+	return netlink.NetworkLinkAddIpVlan(masterDev, ipVlanDev, mode)
+}
+
 func SetInterfaceInNamespacePid(name string, nsPid int) error {
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
@@ -114,4 +118,13 @@ func SetHairpinMode(name string, enabled bool) error {
 		return err
 	}
 	return netlink.SetHairpinMode(iface, enabled)
+}
+
+func SetTxQueueLength(name string, txQueueLen int) error {
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return err
+	}
+
+	return netlink.NetworkSetTxQueueLen(iface, txQueueLen)
 }

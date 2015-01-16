@@ -78,11 +78,16 @@ type Ipc struct {
 }
 
 type NetworkInterface struct {
-	Gateway              string `json:"gateway"`
-	IPAddress            string `json:"ip"`
-	IPPrefixLen          int    `json:"ip_prefix_len"`
-	MacAddress           string `json:"mac"`
-	Bridge               string `json:"bridge"`
+	// Type of the network interface: must be either "veth" or "ipvlan".
+	Type        string `json:"type"`
+	Gateway     string `json:"gateway"`
+	IPAddress   string `json:"ip"`
+	IPPrefixLen int    `json:"ip_prefix_len"`
+	MacAddress  string `json:"mac"`
+	// Bridge is relevant only if the interface Type is "veth".
+	Bridge               string `json:"bridge,omitempty"`
+	IpvlanMasterDevice   string `json:"ipvlan_master_device"`
+	IpvlanDeviceMode     string `json:"ipvlan_device_mode"`
 	GlobalIPv6Address    string `json:"global_ipv6"`
 	LinkLocalIPv6Address string `json:"link_local_ipv6"`
 	GlobalIPv6PrefixLen  int    `json:"global_ipv6_prefix_len"`

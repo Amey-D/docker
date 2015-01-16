@@ -96,20 +96,31 @@ func (d *driver) createNetwork(container *libcontainer.Config, c *execdriver.Com
 	}
 
 	if c.Network.Interface != nil {
-		vethNetwork := libcontainer.Network{
-			Mtu:        c.Network.Mtu,
-			Address:    fmt.Sprintf("%s/%d", c.Network.Interface.IPAddress, c.Network.Interface.IPPrefixLen),
-			MacAddress: c.Network.Interface.MacAddress,
-			Gateway:    c.Network.Interface.Gateway,
-			Type:       "veth",
-			Bridge:     c.Network.Interface.Bridge,
-			VethPrefix: "veth",
+		netIf := c.Network.Interface
+		containerNetwork := libcontainer.Network{
+			Mtu:     c.Network.Mtu,
+			Address: fmt.Sprintf("%s/%d", netIf.IPAddress, netIf.IPPrefixLen),
+			Gateway: netIf.Gateway,
+			Type:    netIf.Type,
 		}
-		if c.Network.Interface.GlobalIPv6Address != "" {
-			vethNetwork.IPv6Address = fmt.Sprintf("%s/%d", c.Network.Interface.GlobalIPv6Address, c.Network.Interface.GlobalIPv6PrefixLen)
-			vethNetwork.IPv6Gateway = c.Network.Interface.IPv6Gateway
+
+		if netIf.Type == "veth" {
+			containerNetwork.MacAddress = netIf.MacAddress
+			containerNetwork.Bridge = netIf.Bridge
+			containerNetwork.VethPrefix = "veth"
+		} else if netIf.Type == "ipvlan" {
+			// XXX Reconcile the field name.
+			containerNetwork.IpvlanMasterDeviceName = netIf.IpvlanMasterDevice
+			containerNetwork.IpvlanDeviceMode = netIf.IpvlanDeviceMode
 		}
-		container.Networks = append(container.Networks, &vethNetwork)
+
+		if netIf.GlobalIPv6Address != "" {
+			containerNetwork.IPv6Address = fmt.Sprintf("%s/%d", netIf.GlobalIPv6Address,
+				netIf.GlobalIPv6PrefixLen)
+			containerNetwork.IPv6Gateway = netIf.IPv6Gateway
+		}
+
+		container.Networks = append(container.Networks, &containerNetwork)
 	}
 
 	if c.Network.ContainerID != "" {

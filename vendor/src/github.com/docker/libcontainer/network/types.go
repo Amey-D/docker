@@ -5,14 +5,21 @@ package network
 // The network configuration can be omited from a container causing the
 // container to be setup with the host's networking stack
 type Network struct {
-	// Type sets the networks type, commonly veth and loopback
+	// Type sets the networks type, commonly veth. ipvlan and loopback
 	Type string `json:"type,omitempty"`
 
-	// The bridge to use.
+	// The bridge to use when network type is "veth".
 	Bridge string `json:"bridge,omitempty"`
 
 	// Prefix for the veth interfaces.
 	VethPrefix string `json:"veth_prefix,omitempty"`
+
+	IpvlanMasterDeviceName string `json:"ipvlan_master,omitempty"`
+
+	// Name of network device, when the network type is "ipvlan".
+	IpvlanDeviceName string `json:"ipvlan_slave,omitempty"`
+
+	IpvlanDeviceMode string `json:"ipvlan_mode,omitempty"`
 
 	// MacAddress contains the MAC address to set on the network interface
 	MacAddress string `json:"mac_address,omitempty"`
@@ -47,4 +54,7 @@ type NetworkState struct {
 	VethHost string `json:"veth_host,omitempty"`
 	// The name of the veth interface created inside the container for the child.
 	VethChild string `json:"veth_child,omitempty"`
+
+	// Name pf the IPVLAN device when it is inside container's network namespace
+	IpvlanDeviceName string `json:"ipvlan,omitempty"`
 }
